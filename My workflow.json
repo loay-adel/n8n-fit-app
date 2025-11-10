@@ -1,0 +1,631 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        288,
+        192
+      ],
+      "id": "bd777f50-7708-4115-95d5-68199b7b6738",
+      "name": "Telegram Trigger",
+      "webhookId": "6086e5d0-2a22-49ce-a341-9b06423de1ce",
+      "credentials": {
+        "telegramApi": {
+          "id": "7eglJGkwWpMFOXmr",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5164b37f-c0c5-4bbf-a66e-b926d0ecbe80",
+              "leftValue": "={{ $json[\"message\"][\"text\"].toLowerCase() }}\n",
+              "rightValue": "gym",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        496,
+        192
+      ],
+      "id": "d523006e-2886-484a-84cd-a7e310fd7869",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "chatId": "5896781846",
+        "text": "=✅ Saved successfully!\n🗓  {{ $now.toFormat(\"dd/MM HH:mm\") }}\n---------------------------------------------------------\n{{ $json.Notes.includes(\"Gym\")?\"💪 signed for GYM \":\"🥗 Signed for meal successfully \" }}\n\n",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        944,
+        192
+      ],
+      "id": "8fbb1279-ce7c-4fb1-a9de-a9da1154dd65",
+      "name": "Send a text message",
+      "webhookId": "376e481b-926d-436d-b9a8-7768cff43ac1",
+      "credentials": {
+        "telegramApi": {
+          "id": "7eglJGkwWpMFOXmr",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 11,
+              "triggerAtMinute": 16
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        272,
+        592
+      ],
+      "id": "8047b41f-d7b9-4366-8305-4934cb658168",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 🧠 البيانات الأساسية\nconst currentWeight = 80;\nconst height = 172;\nconst age = 22;\nconst gender = \"male\";\n\n// 🧮 حساب BMR و سعرات الثبات\nconst BMR =\n  gender === \"male\"\n    ? 10 * currentWeight + 6.25 * height - 5 * age + 5\n    : 10 * currentWeight + 6.25 * height - 5 * age - 161;\n\nconst maintenanceCalories = Math.round(BMR * 1.55);\nconst yesterday = new Date();\nyesterday.setDate(yesterday.getDate() - 1);\nconst dayString = yesterday.toISOString().split(\"T\")[0];\n\n// 🧾 قراءة البيانات بطريقة آمنة (سواء items أو $input.all())\nlet allItems = [];\n\ntry {\n  allItems = items?.map(i => i.json) || [];\n} catch (e) {\n  // fallback لو items مش متعرفة\n  try {\n    allItems = $input.all().map(i => i.json);\n  } catch {\n    allItems = [];\n  }\n}\n\n// ✅ تأكيد إن البيانات فعلاً موجودة\nif (!Array.isArray(allItems) || allItems.length === 0) {\n  return [{ json: { error: \"No data received in Code node.\" } }];\n}\n\n// 🧩 فلترة بيانات اليوم\nconst todayMeals = allItems.filter(\n  r => r.Date === dayString && r.Meal && r.Calories\n);\nconst todayWorkouts = allItems.filter(\n  r => r.Date === dayString && r.Exercise\n);\n\n// 🔢 الحسابات\nconst totalCalories = todayMeals.reduce(\n  (sum, m) => sum + (parseInt(m.Calories) || 0),\n  0\n);\nconst totalBurned = todayWorkouts.reduce(\n  (sum, w) => sum + (parseInt(w[\"Calories Burned\"]) || 0),\n  0\n);\nconst totalTime = todayWorkouts.reduce(\n  (sum, w) => sum + (parseInt(w[\"Duration (min)\"]) || 0),\n  0\n);\n\nconst netCalories = totalCalories - totalBurned;\nconst calorieDiff = maintenanceCalories - netCalories;\nconst weightChangeKg = (calorieDiff / 7700).toFixed(3);\nconst predictedWeight = (currentWeight - weightChangeKg).toFixed(2);\n\n// 🧾 إنشاء ملخص اليوم\nconst summary = `\n📅 *Daily Summary - ${dayString}*\n\n🍽️ *Meals:* ${todayMeals.length}\nTotal intake: ${totalCalories} kcal\n\n🏋️ *Workouts:* ${todayWorkouts.length}\nDuration: ${totalTime} min\nCalories burned: ${totalBurned} kcal\n\n🔥 *Net calories:* ${netCalories} kcal  \n⚖️ *Maintenance calories:* ${maintenanceCalories} kcal  \n${calorieDiff > 0 ? \"📉 Deficit\" : \"📈 Surplus\"}: ${Math.abs(calorieDiff)} kcal\n\n💪 *Estimated weight change:* ${weightChangeKg} kg  \n🏁 *Predicted weight:* ${predictedWeight} kg\n`;\n\n// 📤 النتيجة النهائية\nreturn [\n  {\n    json: {\n      dayString,\n      totalCalories,\n      totalBurned,\n      totalTime,\n      netCalories,\n      maintenanceCalories,\n      calorieDiff,\n      weightChangeKg,\n      predictedWeight,\n      todayMeals,\n      todayWorkouts,\n      summary,\n    },\n  },\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        864,
+        576
+      ],
+      "id": "401640e8-038d-4876-bbda-4262394932d2",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "chatId": "5896781846",
+        "text": "={{ $json.summary }}\n",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1056,
+        576
+      ],
+      "id": "31ebe864-2c12-4c65-a279-d0bcfd55d28f",
+      "name": "Send a text message2",
+      "webhookId": "376e481b-926d-436d-b9a8-7768cff43ac1",
+      "credentials": {
+        "telegramApi": {
+          "id": "7eglJGkwWpMFOXmr",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "5896781846",
+        "text": "Choose type:",
+        "replyMarkup": "replyKeyboard",
+        "replyKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Breakfast",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "Lunch ",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "Dinner ",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "Snack ",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "Workout",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "Water",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "replyKeyboardOptions": {},
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        192,
+        -64
+      ],
+      "id": "b07f4817-6a14-41c3-9d8a-95226e32bf3d",
+      "name": "Send a text message1",
+      "webhookId": "23795dc0-7f7d-4aa2-9e2a-da3f994e42f2",
+      "credentials": {
+        "telegramApi": {
+          "id": "7eglJGkwWpMFOXmr",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = $json[\"message\"][\"text\"];\n\n// Detect type from first word\nlet type = \"\";\nif(text.startsWith(\"Breakfast\")) type = \"Breakfast\";\nelse if(text.startsWith(\"Lunch\")) type = \"Lunch\";\nelse if(text.startsWith(\"Dinner\")) type = \"Dinner\";\nelse if(text.startsWith(\"Snack\")) type = \"Snack\";\nelse if(text.startsWith(\"Workout\")) type = \"Workout\";\nelse if(text.startsWith(\"Water\")) type = \"Water\";\n\n// Extract the rest of the message\nconst details = text.replace(type, \"\").trim();\n\n// Return structured data for Sheets\nreturn [{ json: { type, details, fullText: text } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        -64
+      ],
+      "id": "5732b111-1401-423d-9e43-22d030b21551",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1NoS1r47HodCVQWRT93ilrjrQac8pAILCtDLJlCo2pZM",
+          "mode": "list",
+          "cachedResultName": "Workout_Tracker_Template",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1NoS1r47HodCVQWRT93ilrjrQac8pAILCtDLJlCo2pZM/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1195449613,
+          "mode": "list",
+          "cachedResultName": "Workout",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1NoS1r47HodCVQWRT93ilrjrQac8pAILCtDLJlCo2pZM/edit#gid=1195449613"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $now.toFormat(\"yyyy-MM-dd\") }}",
+            "Time": "={{ $now.toFormat(\"HH:mm\") }}",
+            "Exercise": "={{ $json[\"message\"][\"text\"] }}",
+            "Duration (min)": "={{ $json[\"message\"][\"text\"].match(/(\\d+)\\s*(?:min|minutes?)/i)?.[1] || \"\" }}",
+            "Calories Burned": "={{ $json[\"message\"][\"text\"].match(/(\\d+)\\s*(?:cal|calories?)/i)?.[1] || \"\" }}",
+            "Notes": "=from Telegram to Gym sheet"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Time",
+              "displayName": "Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Exercise",
+              "displayName": "Exercise",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Duration (min)",
+              "displayName": "Duration (min)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Calories Burned",
+              "displayName": "Calories Burned",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        704,
+        96
+      ],
+      "id": "cac08c71-5443-4411-87f3-3e06a4d42b35",
+      "name": "Append row in sheet(GYM)",
+      "alwaysOutputData": false,
+      "notesInFlow": false,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "lB0dojrNsuIRyPgN",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1KrVuM27h34cbnKzK-QhTVI8xVnuX8oyXRoYX8lYuK4I",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 590328417,
+          "mode": "list",
+          "cachedResultName": "Meals",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1KrVuM27h34cbnKzK-QhTVI8xVnuX8oyXRoYX8lYuK4I/edit#gid=590328417"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $now.toFormat(\"yyyy-MM-dd\") }}",
+            "Time": "={{ $now.toFormat(\"HH:mm\") }}\n",
+            "Meal": "={{ $json[\"message\"][\"text\"] }}\n",
+            "Notes": "from Telegram to Meal sheet",
+            "Calories": "={{ $json[\"message\"][\"text\"].match(/(\\d+)\\s*(?:kcal|cal)/i)?.[1] || \"\" }}\n"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Time",
+              "displayName": "Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Meal",
+              "displayName": "Meal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Calories",
+              "displayName": "Calories",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        736,
+        288
+      ],
+      "id": "fc4f6a07-72e0-4017-901a-295a30352f1a",
+      "name": "Append row in sheet1(FOOD)",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "lB0dojrNsuIRyPgN",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1KrVuM27h34cbnKzK-QhTVI8xVnuX8oyXRoYX8lYuK4I",
+          "mode": "list",
+          "cachedResultName": "Food_Tracker_Template",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1KrVuM27h34cbnKzK-QhTVI8xVnuX8oyXRoYX8lYuK4I/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 590328417,
+          "mode": "list",
+          "cachedResultName": "Meals",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1KrVuM27h34cbnKzK-QhTVI8xVnuX8oyXRoYX8lYuK4I/edit#gid=590328417"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        496,
+        464
+      ],
+      "id": "0c3d1194-4d97-41eb-aa6b-d3a3196d8314",
+      "name": "Get row(s) in sheet(Meals)",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "lB0dojrNsuIRyPgN",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1NoS1r47HodCVQWRT93ilrjrQac8pAILCtDLJlCo2pZM",
+          "mode": "list",
+          "cachedResultName": "Workout_Tracker_Template",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1NoS1r47HodCVQWRT93ilrjrQac8pAILCtDLJlCo2pZM/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1195449613,
+          "mode": "list",
+          "cachedResultName": "Workout",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1NoS1r47HodCVQWRT93ilrjrQac8pAILCtDLJlCo2pZM/edit#gid=1195449613"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        496,
+        624
+      ],
+      "id": "13f23131-1f53-4f8b-876f-2b18bc7819b5",
+      "name": "Get row(s) in sheet(GYM)",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "lB0dojrNsuIRyPgN",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        672,
+        576
+      ],
+      "id": "4e6a72d7-89c6-4b9d-aab6-b02f27509fc5",
+      "name": "Merge"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet(GYM)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Append row in sheet1(FOOD)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet(Meals)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get row(s) in sheet(GYM)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Send a text message2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a text message1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet(GYM)": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet1(FOOD)": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet(Meals)": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet(GYM)": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "534e64dc-caf9-41d9-8a29-aaef28ddcfa0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3a1dc350292f7e282cf23ec9dc5a50153f45ce7cd919282db5c41db0403d92c8"
+  },
+  "id": "DTjIvx4f1sqrEUmn",
+  "tags": []
+}
